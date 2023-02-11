@@ -1,0 +1,5 @@
+#!/bin/sh
+
+CLASSPATH=/opt/parquet-mr-tools/lib/*
+
+java -cp "$CLASSPATH" org.apache.parquet.cli.Main $@
