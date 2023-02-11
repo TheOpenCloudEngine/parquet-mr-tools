@@ -15,7 +15,7 @@ Parquet File CLI (Powered By Parquet MR)
 
 %install
 rm -rf /opt/parquet-mr-tools
-tar xvfz parqeut-mr-tools-1.12.0.tar.gz -C /
+tar xvfz parquet-mr-tools-1.12.0.tar.gz -C /
 cp /opt/parquet-mr-tools/bin/parquet '%{_bindir}'
 
 %clean
