@@ -1,3 +1,3 @@
 #!/bin/sh
 
-rpmbuild -b SPECS/parquet-mr-tools.spec
+rpmbuild -bb --clean --define "_topdir $(pwd)" SPECS/parquet-mr-tools.spec
