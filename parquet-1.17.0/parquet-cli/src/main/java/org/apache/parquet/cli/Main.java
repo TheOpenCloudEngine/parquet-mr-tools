@@ -240,8 +240,7 @@ public class Main extends Configured implements Tool {
     PropertyConfigurator.configure(Main.class.getResource("/cli-logging.properties"));
     Logger console = LoggerFactory.getLogger(Main.class);
     // use Log4j for any libraries using commons-logging
-    LogFactory.getFactory()
-        .setAttribute("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.Log4JLogger");
+    LogFactory.getFactory().setAttribute("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.Log4JLogger");
     int rc = ToolRunner.run(new Configuration(), new Main(console), args);
     System.exit(rc);
   }

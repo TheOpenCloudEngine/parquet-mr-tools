@@ -470,6 +470,14 @@ public abstract class BaseCommand implements Command, Configurable {
           return (Iterable<D>) asIterable(grp);
         }
         Configuration conf = new Configuration(getConf());
+
+        // parquet.avro.readInt96AsFixed
+        System.out.println("parquet.avro.readInt96AsFixed = " + System.getProperty("parquet.avro.readInt96AsFixed"));
+        if (System.getProperty("parquet.avro.readInt96AsFixed") != null) {
+          System.out.println("Use parquet.avro.readInt96AsFixed");
+          conf.setBoolean(AvroReadSupport.READ_INT96_AS_FIXED, true);
+        }
+
         // TODO: add these to the reader builder
         AvroReadSupport.setRequestedProjection(conf, projection);
         AvroReadSupport.setAvroReadSchema(conf, projection);
