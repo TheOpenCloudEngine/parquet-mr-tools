@@ -7,3 +7,11 @@ Parquet 파일을 관리하는 커맨드 및 JAR 파일을 RPM으로 빌드하�
 ## Requirement
 
 * JDK 17
+
+## INT96 타임스탬프 읽기
+
+INT96 컬럼을 FIXED(12바이트)로 읽으려면 다음과 같이 실행합니다.
+
+```
+JAVA_OPTS="-Dparquet.avro.readInt96AsFixed=true" parquet cat <file>
+```

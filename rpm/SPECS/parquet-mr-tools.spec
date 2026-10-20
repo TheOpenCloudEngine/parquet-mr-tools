@@ -1,35 +1,32 @@
 Name:           parquet-mr-tools
-Version:        1.17.0 
+Version:        1.17.0
 Release:        1%{?dist}
-Summary:        Parquet File CLI (Powered By Parquet MR) 
-BuildArch:	noarch
+Summary:        Parquet File CLI (Powered By Parquet MR)
+BuildArch:      noarch
 
-License:        Apache License 
-URL:            https://github.com/DataDynamics/parquet-mr-tools 
+Vendor:         The Open Cloud Engine
+Packager:       KIM BYOUNG GON <fharenheit@gmail.com>
+License:        Apache-2.0
+URL:            https://parquet.apache.org/
 
 Requires:       bash
-
-%define _buildrootdir %(pwd)
-BuildRoot: %{_buildrootdir}
+Requires:       java-17-openjdk
 
 %description
 Parquet MR Tools (Powered By Parquet MR)
 
 %install
-rm -rf /opt/parquet-mr-tools
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/opt/parquet-mr-tools/lib
 mkdir -p %{buildroot}/opt/parquet-mr-tools/bin
-cp %{_topdir}/SOURCES/parquet %{buildroot}/opt/parquet-mr-tools/bin/
+mkdir -p %{buildroot}/usr/bin
+
+install -m 755 %{_topdir}/SOURCES/parquet %{buildroot}/opt/parquet-mr-tools/bin/parquet
 cp %{_topdir}/SOURCES/*.jar %{buildroot}/opt/parquet-mr-tools/lib/
 
-%clean
-rm -rf %{buildroot}
+ln -sf /opt/parquet-mr-tools/bin/parquet %{buildroot}/usr/bin/parquet
 
 %files
 %defattr(-,root,root,-)
 /opt/parquet-mr-tools/
-/opt/parquet-mr-tools/bin/*
-/opt/parquet-mr-tools/lib/*.jar
-
-
+/usr/bin/parquet

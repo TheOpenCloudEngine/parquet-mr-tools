@@ -50,11 +50,11 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.HadoopReadOptions;
-import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.cli.json.AvroJsonReader;
 import org.apache.parquet.cli.util.Formats;
 import org.apache.parquet.cli.util.GetClassLoader;
+import org.apache.parquet.cli.util.Int96AwareAvroReadSupport;
 import org.apache.parquet.cli.util.Schemas;
 import org.apache.parquet.cli.util.SeekableFSDataInputStream;
 import org.apache.parquet.crypto.DecryptionKeyRetriever;
@@ -473,9 +473,10 @@ public abstract class BaseCommand implements Command, Configurable {
         // TODO: add these to the reader builder
         AvroReadSupport.setRequestedProjection(conf, projection);
         AvroReadSupport.setAvroReadSchema(conf, projection);
-        final ParquetReader<D> parquet = AvroParquetReader.<D>builder(qualifiedPath(source))
-            .disableCompatibility()
-            .withDataModel(GenericData.get())
+        // Same as AvroParquetReader with disableCompatibility(), but keeps INT96 columns readable with a projection
+        conf.setBoolean(AvroReadSupport.AVRO_COMPATIBILITY, false);
+        final ParquetReader<D> parquet = ParquetReader.<D>builder(
+                new Int96AwareAvroReadSupport<D>(GenericData.get()), qualifiedPath(source))
             .withConf(conf)
             .build();
         return new Iterable<D>() {

@@ -1,15 +1,17 @@
 #!/bin/sh
 
-ROOT_OUTPUT="/build/rpm"
-JAR_OUT="$ROOT_OUTPUT/SOURCES "
+set -e
 
-rm -rf "$ROOT_OUTPUT"
+ROOT_OUTPUT="/build/rpm"
+JAR_OUT="$ROOT_OUTPUT/SOURCES"
+PARQUET_VERSION="1.17.0"
+
+# SOURCES also holds the launcher script, so only clear previously collected JARs
 mkdir -p "$JAR_OUT"
+rm -f "$JAR_OUT"/*.jar
 
 dnf config-manager --set-enabled crb
 dnf install -y epel-release
-
-dnf install epel-release -y
 dnf groupinstall -y 'Development Tools'
 dnf install -y \
     cmake \
@@ -23,7 +25,6 @@ dnf install -y \
     java-17-openjdk-devel \
     brotli-devel \
     snappy-devel \
-    boost-devel \
     maven \
     glib2-devel
 
@@ -38,14 +39,13 @@ cd ../parquet-1.17.0
 
 echo ">>> 빌드 및 의존성 추출 시작..."
 
-mvn clean package -DskipTests
-mvn dependency:copy-dependencies -DoutputDirectory="$JAR_OUT" -DincludeScope=runtime
+# Build parquet-cli and the modules it depends on, installing them so the next step resolves this build's artifacts
+mvn clean install -DskipTests -pl parquet-cli -am
 
-find . -mindepth 2 -maxdepth 3 -name "target" -type d | while read target_dir; do
-    find "$target_dir" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "original-*.jar" ! -name "*-runtime.jar" ! -name "*-javadoc.jar" -exec cp {} "$JAR_OUT" \;
-done
+# Collect only parquet-cli's runtime classpath; the local profile switches Hadoop/log4j from provided to compile scope
+mvn dependency:copy-dependencies -pl parquet-cli -Plocal -DoutputDirectory="$JAR_OUT" -DincludeScope=runtime
+cp "parquet-cli/target/parquet-cli-$PARQUET_VERSION.jar" "$JAR_OUT"
 
-find . -mindepth 2 -maxdepth 3 -name "target" -type d | while read target_dir; do
-    find "$target_dir" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "original-*.jar" ! -name "*-runtime.jar" ! -name "*-javadoc.jar" -exec cp {} ../rpm/SOURCES \;
-done
-
+# brotli-codec is an optional dependency of parquet-hadoop, so it is not inherited and must be copied explicitly
+mvn -N dependency:copy -Dartifact=com.github.rdblue:brotli-codec:0.1.1 -DoutputDirectory="$JAR_OUT" \
+    -DremoteRepositories=jitpack::default::https://jitpack.io

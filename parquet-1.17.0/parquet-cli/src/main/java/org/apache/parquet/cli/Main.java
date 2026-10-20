@@ -39,6 +39,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Level;
 import org.apache.log4j.PropertyConfigurator;
+import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.cli.commands.CSVSchemaCommand;
 import org.apache.parquet.cli.commands.CatCommand;
 import org.apache.parquet.cli.commands.CheckParquet251Command;
@@ -240,9 +241,14 @@ public class Main extends Configured implements Tool {
     PropertyConfigurator.configure(Main.class.getResource("/cli-logging.properties"));
     Logger console = LoggerFactory.getLogger(Main.class);
     // use Log4j for any libraries using commons-logging
-    LogFactory.getFactory()
-        .setAttribute("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.Log4JLogger");
-    int rc = ToolRunner.run(new Configuration(), new Main(console), args);
+    LogFactory.getFactory().setAttribute("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.Log4JLogger");
+    Configuration conf = new Configuration();
+    // Allow -Dparquet.avro.readInt96AsFixed=true via JAVA_OPTS; Hadoop's -D option still takes precedence
+    String readInt96AsFixed = System.getProperty(AvroReadSupport.READ_INT96_AS_FIXED);
+    if (readInt96AsFixed != null) {
+      conf.setBoolean(AvroReadSupport.READ_INT96_AS_FIXED, Boolean.parseBoolean(readInt96AsFixed));
+    }
+    int rc = ToolRunner.run(conf, new Main(console), args);
     System.exit(rc);
   }
 
