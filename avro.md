@@ -15,6 +15,7 @@ mkdir -p out
 ## 목차
 
 - [기본 사용법](#기본-사용법)
+- [bash 자동 완성](#bash-자동-완성)
 - [명령 목록](#명령-목록)
 - [스키마와 메타데이터 조회](#스키마와-메타데이터-조회)
 - [데이터 조회](#데이터-조회)
@@ -49,6 +50,17 @@ Option                         Description
 --pretty                       Turns on pretty printing.                    
 --reader-schema [String]       Reader schema                                
 --reader-schema-file [String]  Reader schema file                           
+```
+
+## bash 자동 완성
+
+RPM을 설치하면 `/usr/share/bash-completion/completions/avro`가 설치되어, `Tab` 키로 도구 이름, 옵션, 코덱 이름을 완성할 수 있습니다.
+`bash-completion` 패키지가 필요하며, 설치 직후에는 새 셸을 열어야 적용됩니다.
+
+```
+avro to<Tab>                    → tojson totext totrevni
+avro tojson --<Tab>             → --head --pretty --reader-schema --reader-schema-file
+avro recodec --codec <Tab>      → bzip2 deflate null snappy xz zstandard
 ```
 
 ## 명령 목록
@@ -190,6 +202,14 @@ $ avro tojson --head=2 samples/users.avro
 ```
 
 출력은 Avro JSON 인코딩이므로 union 타입 값은 `{"string": "..."}`처럼 타입 이름으로 감싸집니다. `date`, `timestamp-millis`는 숫자 그대로 출력됩니다.
+
+날짜/시간 문자열로 보려면 [`parquet cat`](parquet.md#날짜시간-표시와-시간대)으로 Avro 파일을 조회하세요.
+
+```
+$ parquet cat -n 2 -c name,signup_date,last_login samples/users.avro
+{"name": "Alice Kim", "signup_date": "2023-01-15", "last_login": "2026-10-01T09:12:30Z"}
+{"name": "Bob Lee", "signup_date": "2023-03-02", "last_login": "2026-09-28T18:45:00Z"}
+```
 
 `--pretty`로 보기 좋게 출력합니다.
 
@@ -374,13 +394,15 @@ $ parquet convert samples/users.avro -o out/users.parquet
 $ parquet to-avro samples/users.parquet -o out/users.avro
 ```
 
-Parquet의 INT96 타임스탬프 컬럼은 Avro로 변환하면 12바이트 `fixed` 값이 되며, `avro tojson`에서는 바이트 문자열로 출력됩니다. 날짜/시간으로 보려면 Parquet 파일을 `parquet cat`으로 조회하세요.
+Parquet의 INT96 타임스탬프 컬럼은 기본적으로 Avro의 12바이트 `fixed` 값이 되며, `avro tojson`에서는 알아보기 어려운 바이트 문자열로 출력됩니다.
+`parquet to-avro --int96-as-timestamp`로 변환하면 `timestamp-micros`(epoch 마이크로초)로 기록되어 다른 도구에서도 타임스탬프로 다룰 수 있습니다.
 
 ```
-$ parquet to-avro samples/events_int96.parquet -o out/events.avro
+$ parquet to-avro samples/events_int96.parquet -o out/events_ts.avro --int96-as-timestamp
 
-$ avro tojson --head=1 out/events.avro
-{"event_id":1,"user_id":1,"event_type":"login","event_time":"\u00159U]&\u001E\u0000\u0000%\u0000","processed_at":{"processed_at":"\u00006&\u001E\u0000\u0000%\u0000"},"detail":{"detail":{"ip":{"string":"10.0.0.11"},"duration_ms":{"long":120}}}}
+$ avro tojson --head=2 out/events_ts.avro
+{"event_id":1,"user_id":1,"event_type":"login","event_time":1790845950123456,"processed_at":{"long":1790845951000000},"detail":{"detail":{"ip":{"string":"10.0.0.11"},"duration_ms":{"long":120}}}}
+{"event_id":2,"user_id":4,"event_type":"purchase","event_time":1792098342500000,"processed_at":{"long":1792098343250000},"detail":{"detail":{"ip":{"string":"10.0.0.24"},"duration_ms":{"long":3400}}}}
 ```
 
 ## 주의 사항

@@ -2,3 +2,7 @@ rpm/BUILD/
 rpm/BUILDROOT/
 rpm/SRPMS/
 avro-*/toolchains.xml
+# Build outputs: build.sh collects the JARs and rpm/build.sh builds the RPM (published on GitHub Releases)
+rpm/RPMS/
+rpm/SOURCES/*.jar
+rpm/SOURCES/avro-tools/

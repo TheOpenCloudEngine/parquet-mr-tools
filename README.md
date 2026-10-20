@@ -3,6 +3,14 @@
 Parquet 및 Avro 파일을 관리하는 커맨드(`parquet`, `avro`)와 JAR 파일을 RPM으로 빌드하는 프로젝트입니다.
 
 upstream `parquet-cli`는 INT96 타임스탬프 컬럼이 있는 파일을 읽지 못하므로, 이 프로젝트는 INT96을 기본으로 읽고 날짜/시간으로 보여 주도록 수정한 `parquet-cli`를 제공합니다.
+upstream과 비교해 다음 기능이 추가되어 있습니다.
+
+* INT96 타임스탬프 컬럼을 별도 옵션 없이 읽기
+* `cat`/`head`에서 INT96, `date`, `time`, `timestamp` 값을 ISO-8601 문자열로 출력, `parquet.cli.timezone`으로 출력 시간대 지정
+* `cat -c detail.ip`처럼 optional 그룹 안의 컬럼 선택 (upstream 버그 수정)
+* `convert --bloom-filter-columns`로 Bloom filter 기록
+* `to-avro --int96-as-timestamp`로 INT96을 Avro `timestamp-micros`로 변환
+* `parquet`, `avro` 명령의 bash 자동 완성
 
 RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
 
@@ -17,10 +25,28 @@ RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
 
 [`samples/`](samples/)의 샘플 파일로 실제 실행한 결과를 담은 매뉴얼입니다.
 
-* [parquet 명령 사용법](parquet.md): 스키마/데이터/메타데이터 조회, INT96 타임스탬프, Bloom filter, Avro/CSV 변환, 컬럼 제거·마스킹·압축 변경
-* [avro 명령 사용법](avro.md): 스키마/메타데이터 조회, JSON 변환, 레코드 추출·합치기, 압축 코덱 변경, 스키마 도구
+* [parquet 명령 사용법](parquet.md): 스키마/데이터/메타데이터 조회, 날짜/시간 표시와 시간대, INT96 타임스탬프, Bloom filter, Avro/CSV 변환, 컬럼 제거·마스킹·압축 변경, bash 자동 완성
+* [avro 명령 사용법](avro.md): 스키마/메타데이터 조회, JSON 변환, 레코드 추출·합치기, 압축 코덱 변경, 스키마 도구, bash 자동 완성
+
+## 설치
+
+[GitHub Releases](https://github.com/TheOpenCloudEngine/parquet-avro-tools/releases)에서 RPM을 내려받아 설치합니다. 이전 패키지(`parquet-mr-tools`)가 설치되어 있으면 이 패키지로 교체됩니다.
+
+```
+sudo dnf install ./parquet-avro-tools-<버전>.noarch.rpm
+```
+
+## 빌드
 
 본 프로젝트의 소스코드로 RPM을 빌드하기 위해서는 리눅스가 필요하며 Ubuntu에서 RPM 파일을 생성하려면 `rpm`을 설치하기 바랍니다.
+
+`build.sh`는 RHEL 계열(Rocky Linux 9 등)에서 저장소가 `/build`에 있다고 가정하고, 빌드 도구 설치부터 Thrift, Parquet, Avro 빌드와 런타임 JAR 수집(`rpm/SOURCES`)까지 수행합니다. 이후 `rpm/build.sh`로 RPM을 만듭니다.
+
+```
+cd /build
+./build.sh
+cd rpm && ./build.sh    # rpm/RPMS/noarch/parquet-avro-tools-<버전>.noarch.rpm
+```
 
 ## Requirement
 
@@ -38,7 +64,7 @@ RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
 | `parquet-1.18.1/` | 현재 빌드 대상. upstream 1.18.1 소스에 INT96 지원 수정을 적용 |
 | `avro-1.12.2/` | Apache Avro 1.12.2 소스 (`avro-tools` 빌드용) |
 | `thrift-0.23.0/` | Parquet 1.18.1 빌드에 필요한 Thrift 소스 |
-| `rpm/` | RPM 스펙, 실행 스크립트, 런타임 JAR, 빌드된 RPM |
+| `rpm/` | RPM 스펙, 실행 스크립트, bash 자동 완성 스크립트 (`rpm/SOURCES`의 JAR과 `rpm/RPMS`의 RPM은 빌드 결과물이라 git에 포함하지 않음) |
 | `samples/` | 매뉴얼용 샘플 Parquet/Avro/CSV 파일과 생성 스크립트(`generate.sh`) |
 
 ## 버전별 주요 변경 사항
@@ -87,10 +113,11 @@ RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
 ## INT96 타임스탬프 읽기
 
 INT96 컬럼은 별도 옵션 없이 읽히며, `cat`/`head` 출력에서 UTC 기준 ISO-8601 타임스탬프로 표시됩니다.
+출력 시간대는 `parquet.cli.timezone`(예: `-Dparquet.cli.timezone=Asia/Seoul`)으로 바꿀 수 있습니다([날짜/시간 표시와 시간대](parquet.md#날짜시간-표시와-시간대)).
 
 ```
-$ parquet cat events.parquet
-{"id": 1, "ts": "2024-01-01T09:30:00.123456789Z", "ev": {"name": "login", "at": "2024-01-02T00:00:00Z"}}
+$ parquet head -n 1 samples/events_int96.parquet
+{"event_id": 1, "user_id": 1, "event_type": "login", "event_time": "2026-10-01T09:12:30.123456789Z", "processed_at": "2026-10-01T09:12:31Z", "detail": {"ip": "10.0.0.11", "duration_ms": 120}}
 ```
 
 upstream과 같이 INT96 컬럼을 읽지 않으려면 옵션을 끕니다.
@@ -100,4 +127,4 @@ JAVA_OPTS="-Dparquet.avro.readInt96AsFixed=false" parquet cat <file>
 parquet -D parquet.avro.readInt96AsFixed=false cat <file>
 ```
 
-`to-avro`, `convert` 등 파일을 쓰는 명령은 INT96 값을 12바이트 FIXED 값 그대로 기록합니다.
+`to-avro`, `convert` 등 파일을 쓰는 명령은 INT96 값을 12바이트 FIXED 값 그대로 기록합니다. `to-avro`에 `--int96-as-timestamp`를 지정하면 Avro `timestamp-micros`로 변환해서 기록합니다.

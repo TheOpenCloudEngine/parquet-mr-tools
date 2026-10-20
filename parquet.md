@@ -16,9 +16,11 @@ mkdir -p out
 
 - [샘플 파일](#샘플-파일)
 - [공통 옵션](#공통-옵션)
+- [bash 자동 완성](#bash-자동-완성)
 - [명령 목록](#명령-목록)
 - [스키마 조회](#스키마-조회)
 - [데이터 조회](#데이터-조회)
+- [날짜/시간 표시와 시간대](#날짜시간-표시와-시간대)
 - [INT96 타임스탬프](#int96-타임스탬프)
 - [메타데이터 조회](#메타데이터-조회)
 - [Bloom filter 조회](#bloom-filter-조회)
@@ -82,6 +84,8 @@ Usage: parquet [general options] convert [command options]
 	A compression codec name.
     --page-size
 	Target page size
+    --bloom-filter-columns
+	Comma-separated columns (dot paths) to write bloom filters for. Dictionary encoding is disabled for these columns because bloom filters are not written for dictionary-encoded columns
     -s, --schema
 	The file containing the Avro schema.
     --dictionary-size
@@ -95,6 +99,17 @@ Usage: parquet [general options] convert [command options]
 
   * = required
 ...
+```
+
+## bash 자동 완성
+
+RPM을 설치하면 `/usr/share/bash-completion/completions/parquet`이 설치되어, `Tab` 키로 명령, 옵션, 압축 코덱 이름 등을 완성할 수 있습니다.
+`bash-completion` 패키지가 필요하며, 설치 직후에는 새 셸을 열어야 적용됩니다.
+
+```
+parquet co<Tab>                        → column-index column-size convert convert-csv
+parquet convert --compression-codec <Tab> → brotli gzip lz4 lz4_raw lzo snappy uncompressed zstd
+parquet to-avro --i<Tab>               → --int96-as-timestamp
 ```
 
 ## 명령 목록
@@ -235,14 +250,14 @@ $ parquet schema samples/users.avro
 
 ```
 $ parquet head -n 3 samples/users.parquet
-{"id": 1, "name": "Alice Kim", "email": "alice@example.com", "age": 34, "score": 91.5, "active": true, "signup_date": 19372, "last_login": 1790845950000, "tags": ["admin", "beta"], "address": {"city": "Seoul", "zip": "04524"}}
-{"id": 2, "name": "Bob Lee", "email": null, "age": 28, "score": 78.25, "active": true, "signup_date": 19418, "last_login": 1790621100000, "tags": ["beta"], "address": {"city": "Busan", "zip": "48058"}}
-{"id": 3, "name": "Charlie Park", "email": "charlie@example.com", "age": 45, "score": 66.0, "active": false, "signup_date": 19316, "last_login": 1781422215000, "tags": [], "address": {"city": "Incheon", "zip": "21554"}}
+{"id": 1, "name": "Alice Kim", "email": "alice@example.com", "age": 34, "score": 91.5, "active": true, "signup_date": "2023-01-15", "last_login": "2026-10-01T09:12:30Z", "tags": ["admin", "beta"], "address": {"city": "Seoul", "zip": "04524"}}
+{"id": 2, "name": "Bob Lee", "email": null, "age": 28, "score": 78.25, "active": true, "signup_date": "2023-03-02", "last_login": "2026-09-28T18:45:00Z", "tags": ["beta"], "address": {"city": "Busan", "zip": "48058"}}
+{"id": 3, "name": "Charlie Park", "email": "charlie@example.com", "age": 45, "score": 66.0, "active": false, "signup_date": "2022-11-20", "last_login": "2026-06-14T07:30:15Z", "tags": [], "address": {"city": "Incheon", "zip": "21554"}}
 ```
 
-`date`는 1970-01-01부터의 일수, `timestamp-millis`는 epoch 밀리초 값 그대로 출력됩니다.
+`date`, `timestamp-millis` 같은 날짜/시간 컬럼은 ISO-8601 문자열로 출력됩니다([날짜/시간 표시와 시간대](#날짜시간-표시와-시간대) 참고).
 
-`-c`로 출력할 컬럼을 고릅니다. 중첩 그룹(`address`)은 그룹 전체를 고를 수 있습니다.
+`-c`로 출력할 컬럼을 고릅니다. 중첩 그룹(`address`)은 그룹 전체를 고르거나 `address.city`처럼 그룹 안의 컬럼을 고를 수 있습니다.
 
 ```
 $ parquet cat -c name,age,address samples/users.parquet
@@ -274,18 +289,86 @@ null
 "jane@example.com"
 ```
 
+optional 그룹 안의 컬럼도 고를 수 있습니다. 그룹이 null인 레코드에서는 null이 출력됩니다.
+
+```
+$ parquet cat -c detail.ip samples/events_int96.parquet
+"10.0.0.11"
+"10.0.0.24"
+"10.0.0.36"
+null
+"10.0.0.47"
+
+$ parquet cat -c detail.duration_ms,event_type samples/events_int96.parquet
+{"detail": {"duration_ms": 120}, "event_type": "login"}
+{"detail": {"duration_ms": 3400}, "event_type": "purchase"}
+{"detail": {"duration_ms": 95}, "event_type": "login"}
+{"detail": null, "event_type": "logout"}
+{"detail": {"duration_ms": 15800}, "event_type": "view"}
+```
+
 `cat`/`head`는 Avro 파일도 읽습니다.
 
 ```
 $ parquet cat -n 2 samples/users.avro
-{"id": 1, "name": "Alice Kim", "email": "alice@example.com", "age": 34, "score": 91.5, "active": true, "signup_date": 19372, "last_login": 1790845950000, "tags": ["admin", "beta"], "address": {"city": "Seoul", "zip": "04524"}}
-{"id": 2, "name": "Bob Lee", "email": null, "age": 28, "score": 78.25, "active": true, "signup_date": 19418, "last_login": 1790621100000, "tags": ["beta"], "address": {"city": "Busan", "zip": "48058"}}
+{"id": 1, "name": "Alice Kim", "email": "alice@example.com", "age": 34, "score": 91.5, "active": true, "signup_date": "2023-01-15", "last_login": "2026-10-01T09:12:30Z", "tags": ["admin", "beta"], "address": {"city": "Seoul", "zip": "04524"}}
+{"id": 2, "name": "Bob Lee", "email": null, "age": 28, "score": 78.25, "active": true, "signup_date": "2023-03-02", "last_login": "2026-09-28T18:45:00Z", "tags": ["beta"], "address": {"city": "Busan", "zip": "48058"}}
+```
+
+## 날짜/시간 표시와 시간대
+
+`cat`/`head`는 날짜/시간 타입을 ISO-8601 문자열로 출력합니다. 소수점 이하는 3·6·9자리 단위로 표시하고, 0이면 생략합니다.
+
+| 타입 | 출력 예 |
+|---|---|
+| `date` | `"2023-01-15"` |
+| `time-millis`, `time-micros` | `"09:30:00.123"` |
+| `timestamp-millis`, `timestamp-micros`, `timestamp-nanos`, INT96 | `"2026-10-01T09:12:30Z"` (UTC) |
+| `local-timestamp-millis`, `local-timestamp-micros`, `local-timestamp-nanos` | `"2026-10-01T09:12:30"` (시간대 없음) |
+
+```
+$ parquet cat -c name,signup_date,last_login samples/users.parquet
+{"name": "Alice Kim", "signup_date": "2023-01-15", "last_login": "2026-10-01T09:12:30Z"}
+{"name": "Bob Lee", "signup_date": "2023-03-02", "last_login": "2026-09-28T18:45:00Z"}
+{"name": "Charlie Park", "signup_date": "2022-11-20", "last_login": "2026-06-14T07:30:15Z"}
+{"name": "Diana Choi", "signup_date": "2024-02-10", "last_login": "2026-10-15T21:05:42Z"}
+{"name": "Evan Jung", "signup_date": "2021-07-07", "last_login": "2025-12-31T23:59:59Z"}
+{"name": "Fiona Han", "signup_date": "2025-05-21", "last_login": "2026-10-19T12:00:00Z"}
+{"name": "George Yoon", "signup_date": "2024-08-30", "last_login": "2026-10-18T08:20:10Z"}
+{"name": "Hana Lim", "signup_date": "2026-01-03", "last_login": "2026-10-20T06:45:33Z"}
+{"name": "Ian Shin", "signup_date": "2022-04-18", "last_login": "2026-03-09T14:10:00Z"}
+{"name": "Jane Oh", "signup_date": "2023-09-09", "last_login": "2026-10-17T19:30:00Z"}
+```
+
+타임스탬프는 기본적으로 UTC(`Z`)로 출력합니다. `parquet.cli.timezone`으로 시간대를 지정하면 그 시간대의 시각과 오프셋으로 출력합니다.
+`date`, `time`, `local-timestamp`는 시간대와 무관하므로 바뀌지 않습니다.
+
+```
+$ JAVA_OPTS="-Dparquet.cli.timezone=Asia/Seoul" parquet cat -c name,last_login samples/users.parquet
+{"name": "Alice Kim", "last_login": "2026-10-01T18:12:30+09:00"}
+{"name": "Bob Lee", "last_login": "2026-09-29T03:45:00+09:00"}
+{"name": "Charlie Park", "last_login": "2026-06-14T16:30:15+09:00"}
+{"name": "Diana Choi", "last_login": "2026-10-16T06:05:42+09:00"}
+{"name": "Evan Jung", "last_login": "2026-01-01T08:59:59+09:00"}
+{"name": "Fiona Han", "last_login": "2026-10-19T21:00:00+09:00"}
+{"name": "George Yoon", "last_login": "2026-10-18T17:20:10+09:00"}
+{"name": "Hana Lim", "last_login": "2026-10-20T15:45:33+09:00"}
+{"name": "Ian Shin", "last_login": "2026-03-09T23:10:00+09:00"}
+{"name": "Jane Oh", "last_login": "2026-10-18T04:30:00+09:00"}
+```
+
+`-D`로도 지정할 수 있습니다. 단, Impala처럼 INT96에 UTC가 아닌 현지 시각을 그대로 기록한 파일은 시간대를 지정하지 않은 기본 출력의 날짜·시각(`Z` 앞부분)이 기록된 현지 시각과 같습니다.
+
+```
+$ parquet -D parquet.cli.timezone=Asia/Seoul head -n 2 samples/events_int96.parquet
+{"event_id": 1, "user_id": 1, "event_type": "login", "event_time": "2026-10-01T18:12:30.123456789+09:00", "processed_at": "2026-10-01T18:12:31+09:00", "detail": {"ip": "10.0.0.11", "duration_ms": 120}}
+{"event_id": 2, "user_id": 4, "event_type": "purchase", "event_time": "2026-10-16T06:05:42.500+09:00", "processed_at": "2026-10-16T06:05:43.250+09:00", "detail": {"ip": "10.0.0.24", "duration_ms": 3400}}
 ```
 
 ## INT96 타임스탬프
 
 Hive, Impala, 이전 버전 Spark가 쓰는 INT96 타임스탬프 컬럼은 별도 옵션 없이 읽히며, `cat`/`head`에서 UTC 기준 ISO-8601 문자열로 출력됩니다.
-나노초 정밀도까지 표시하고, 0인 소수 자릿수는 생략합니다.
+나노초 정밀도까지 표시합니다(형식은 [날짜/시간 표시와 시간대](#날짜시간-표시와-시간대) 참고).
 
 ```
 $ parquet schema --parquet samples/events_int96.parquet
@@ -580,7 +663,7 @@ Row group 0:
 column name has no bloom filter
 ```
 
-`parquet` 명령으로 만드는 파일에는 Bloom filter를 넣을 수 없습니다. `--conf parquet.bloom.filter.enabled=true`를 지정해도 적용되지 않습니다.
+Bloom filter는 `parquet convert --bloom-filter-columns`로 넣을 수 있습니다([Bloom filter 넣기](#bloom-filter-넣기) 참고). `--conf parquet.bloom.filter.enabled=true`로는 적용되지 않습니다.
 `samples/events_int96.parquet`의 Bloom filter는 `samples/Int96Sample.java`에서 Parquet API로 넣은 것입니다.
 
 ## Avro/CSV에서 Parquet으로 변환
@@ -630,6 +713,38 @@ org.apache.hadoop.fs.FileAlreadyExistsException: File already exists: file:/.../
 ...
 
 $ parquet convert samples/users.avro -o out/users.parquet --overwrite
+```
+
+#### Bloom filter 넣기
+
+`--bloom-filter-columns`로 Bloom filter를 만들 컬럼을 쉼표로 지정합니다(중첩 컬럼은 `address.city`처럼 점으로 구분).
+Parquet은 딕셔너리로 인코딩된 컬럼에는 Bloom filter를 쓰지 않으므로, 지정한 컬럼은 딕셔너리 인코딩을 끄고 기록합니다.
+
+```
+$ parquet convert samples/users.avro -o out/users_bloom.parquet --bloom-filter-columns name,address.city
+
+$ parquet bloom-filter -c name -v "Alice Kim,Nobody" out/users_bloom.parquet
+
+Row group 0: 
+--------------------------------------------------------------------------------
+value Alice Kim maybe exists.
+value Nobody NOT exists.
+
+$ parquet bloom-filter -c address.city -v Seoul,Tokyo out/users_bloom.parquet
+
+Row group 0: 
+--------------------------------------------------------------------------------
+value Seoul maybe exists.
+value Tokyo NOT exists.
+```
+
+`meta`에서 `address.city`가 딕셔너리 없이(`G   _`) 기록된 것을 확인할 수 있습니다(`samples/users.parquet`에서는 `G _ R`).
+
+```
+$ parquet meta out/users_bloom.parquet
+...
+address.city  BINARY    G   _     10        10.40 B    0       "Busan" / "Ulsan"
+...
 ```
 
 ### csv-schema
@@ -713,11 +828,39 @@ CSV의 빈 값은 null이 아니라 빈 문자열(`""`)로 들어갑니다. 구�
 $ parquet to-avro samples/users.parquet -o out/users.avro
 ```
 
-INT96 컬럼은 12바이트 `fixed` 값 그대로 기록됩니다(타임스탬프로 변환되지 않음).
+INT96 컬럼은 기본적으로 12바이트 `fixed` 값 그대로 기록됩니다.
 
 ```
 $ parquet to-avro samples/events_int96.parquet -o out/events.avro
 ```
+
+`--int96-as-timestamp`를 지정하면 INT96 컬럼을 Avro `timestamp-micros`(epoch 마이크로초)로 바꿔 기록합니다. 마이크로초보다 작은 자릿수는 버려집니다.
+
+```
+$ parquet to-avro samples/events_int96.parquet -o out/events_ts.avro --int96-as-timestamp
+
+$ avro getschema out/events_ts.avro
+...
+    "name" : "event_time",
+    "type" : {
+      "type" : "long",
+      "logicalType" : "timestamp-micros"
+    }
+  }, {
+    "name" : "processed_at",
+    "type" : [ "null", {
+      "type" : "long",
+      "logicalType" : "timestamp-micros"
+    } ],
+    "default" : null
+...
+
+$ parquet head -n 2 out/events_ts.avro
+{"event_id": 1, "user_id": 1, "event_type": "login", "event_time": "2026-10-01T09:12:30.123456Z", "processed_at": "2026-10-01T09:12:31Z", "detail": {"ip": "10.0.0.11", "duration_ms": 120}}
+{"event_id": 2, "user_id": 4, "event_type": "purchase", "event_time": "2026-10-15T21:05:42.500Z", "processed_at": "2026-10-15T21:05:43.250Z", "detail": {"ip": "10.0.0.24", "duration_ms": 3400}}
+```
+
+원본의 `2026-10-01T09:12:30.123456789Z`가 `.123456Z`로 기록된 것을 볼 수 있습니다.
 
 ## Parquet 파일 재작성
 
@@ -808,22 +951,6 @@ Time: 0.253 s
 `prune`, `trans-compression`, `masking` 명령도 있지만 deprecated 상태이며 2.0.0에서 제거될 예정이므로 `rewrite`를 사용합니다.
 
 ## 주의 사항
-
-- **optional 그룹 안의 컬럼 하나만 선택할 수 없음**: optional 그룹(`detail`) 안의 컬럼을 고르면 오류가 발생합니다. upstream의 기존 버그이며, `-c detail`처럼 그룹 전체를 고르면 됩니다.
-
-  ```
-  $ parquet cat -c detail.ip samples/events_int96.parquet
-  Unknown error
-  org.apache.avro.AvroTypeException: Invalid default for field detail: null not a {"type":"record","name":"detail","fields":[{"name":"ip","type":["null","string"],"default":null}]}
-  ...
-
-  $ parquet cat -c detail samples/events_int96.parquet
-  {"ip": "10.0.0.11", "duration_ms": 120}
-  {"ip": "10.0.0.24", "duration_ms": 3400}
-  {"ip": "10.0.0.36", "duration_ms": 95}
-  null
-  {"ip": "10.0.0.47", "duration_ms": 15800}
-  ```
 
 - **오류 메시지**: 파일이 없는 등의 오류는 `Unknown error`와 스택 트레이스로 출력됩니다.
 
