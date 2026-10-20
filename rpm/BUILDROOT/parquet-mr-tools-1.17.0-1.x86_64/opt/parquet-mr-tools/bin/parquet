@@ -1,5 +1,0 @@
-#!/bin/sh
-
-CLASSPATH=`pwd`/../lib/*
-
-java -cp "$CLASSPATH" org.apache.parquet.cli.Main $@
