@@ -36,9 +36,8 @@ RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
 | 디렉터리 | 설명 |
 |---|---|
 | `parquet-1.18.1/` | 현재 빌드 대상. upstream 1.18.1 소스에 INT96 지원 수정을 적용 |
-| `parquet-1.17.0/` | 이전 버전 소스 |
 | `avro-1.12.2/` | Apache Avro 1.12.2 소스 (`avro-tools` 빌드용) |
-| `thrift-0.23.0/`, `thrift-0.22.0/` | 각각 Parquet 1.18.1, 1.17.0 빌드에 필요한 Thrift 소스 |
+| `thrift-0.23.0/` | Parquet 1.18.1 빌드에 필요한 Thrift 소스 |
 | `rpm/` | RPM 스펙, 실행 스크립트, 런타임 JAR, 빌드된 RPM |
 | `samples/` | 매뉴얼용 샘플 Parquet/Avro/CSV 파일과 생성 스크립트(`generate.sh`) |
 
