@@ -1,3 +1,4 @@
 rpm/BUILD/
 rpm/BUILDROOT/
 rpm/SRPMS/
+avro-*/toolchains.xml
