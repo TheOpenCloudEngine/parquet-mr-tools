@@ -1,0 +1,11 @@
+id,name,email,age,score,active,signup_date,city
+1,Alice Kim,alice@example.com,34,91.5,true,2023-01-15,Seoul
+2,Bob Lee,,28,78.25,true,2023-03-02,Busan
+3,Charlie Park,charlie@example.com,45,66.0,false,2022-11-20,Incheon
+4,Diana Choi,diana@example.com,31,88.75,true,2024-02-10,Seoul
+5,Evan Jung,,52,72.0,false,2021-07-07,Daegu
+6,Fiona Han,fiona@example.com,26,95.0,true,2025-05-21,Gwangju
+7,George Yoon,george@example.com,39,81.5,true,2024-08-30,Daejeon
+8,Hana Lim,,23,59.5,true,2026-01-03,Seoul
+9,Ian Shin,ian@example.com,47,77.0,false,2022-04-18,Ulsan
+10,Jane Oh,jane@example.com,36,84.25,true,2023-09-09,Suwon

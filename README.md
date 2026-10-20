@@ -4,13 +4,32 @@ Parquet 파일을 관리하는 커맨드 및 JAR 파일을 RPM으로 빌드하�
 
 upstream `parquet-cli`는 INT96 타임스탬프 컬럼이 있는 파일을 읽지 못하므로, 이 프로젝트는 INT96을 기본으로 읽고 날짜/시간으로 보여 주도록 수정한 `parquet-cli`를 제공합니다.
 
+RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
+
+| 명령 | 설명 |
+|---|---|
+| `parquet` | Parquet 파일 조회/변환 (Parquet 1.18.1 `parquet-cli`, INT96 지원 수정 적용) |
+| `avro` | Avro 파일 조회/변환 (Apache Avro 1.12.2 `avro-tools`, 예: `avro getschema`, `avro tojson`, `avro count`) |
+
+`avro-tools`는 자체 Hadoop을 포함한 단일 JAR이므로, `parquet`의 클래스패스(`/opt/parquet-mr-tools/lib`)와 분리된 `/opt/parquet-mr-tools/avro`에 설치됩니다.
+
+## 사용법
+
+[`samples/`](samples/)의 샘플 파일로 실제 실행한 결과를 담은 매뉴얼입니다.
+
+* [parquet 명령 사용법](parquet.md): 스키마/데이터/메타데이터 조회, INT96 타임스탬프, Bloom filter, Avro/CSV 변환, 컬럼 제거·마스킹·압축 변경
+* [avro 명령 사용법](avro.md): 스키마/메타데이터 조회, JSON 변환, 레코드 추출·합치기, 압축 코덱 변경, 스키마 도구
+
 본 프로젝트의 소스코드로 RPM을 빌드하기 위해서는 리눅스가 필요하며 Ubuntu에서 RPM 파일을 생성하려면 `rpm`을 설치하기 바랍니다.
 
 ## Requirement
 
-* JDK 17 이상
-* Maven 3.9 이상 (Parquet 소스에 포함된 Maven Wrapper `./mvnw`를 사용하면 별도 설치 불필요)
-* Thrift 컴파일러 0.23.0 (`build.sh`가 `thrift-0.23.0/`을 빌드)
+* 실행: JDK 17 이상
+* 빌드
+  * JDK 17 (Parquet 빌드)
+  * JDK 21, 그리고 Maven toolchain용 JDK 11/17 (Avro 빌드, `build.sh`가 `toolchains.xml`을 생성)
+  * Maven 3.9 이상 (Parquet 소스에 포함된 Maven Wrapper `./mvnw`를 사용하면 별도 설치 불필요, Avro 빌드에도 사용)
+  * Thrift 컴파일러 0.23.0 (`build.sh`가 `thrift-0.23.0/`을 빌드)
 
 ## 소스 구성
 
@@ -18,8 +37,10 @@ upstream `parquet-cli`는 INT96 타임스탬프 컬럼이 있는 파일을 읽�
 |---|---|
 | `parquet-1.18.1/` | 현재 빌드 대상. upstream 1.18.1 소스에 INT96 지원 수정을 적용 |
 | `parquet-1.17.0/` | 이전 버전 소스 (릴리스 `v1.17.0-1`) |
+| `avro-1.12.2/` | Apache Avro 1.12.2 소스 (`avro-tools` 빌드용) |
 | `thrift-0.23.0/`, `thrift-0.22.0/` | 각각 Parquet 1.18.1, 1.17.0 빌드에 필요한 Thrift 소스 |
 | `rpm/` | RPM 스펙, 실행 스크립트, 런타임 JAR, 빌드된 RPM |
+| `samples/` | 매뉴얼용 샘플 Avro/Parquet/CSV 파일과 생성 스크립트(`generate.sh`) |
 
 ## Parquet 버전별 주요 변경 사항
 

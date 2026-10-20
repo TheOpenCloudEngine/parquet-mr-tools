@@ -1,0 +1,25 @@
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "com.example",
+  "doc": "Sample user records",
+  "fields": [
+    {"name": "id", "type": "int"},
+    {"name": "name", "type": "string"},
+    {"name": "email", "type": ["null", "string"], "default": null},
+    {"name": "age", "type": "int"},
+    {"name": "score", "type": "double"},
+    {"name": "active", "type": "boolean"},
+    {"name": "signup_date", "type": {"type": "int", "logicalType": "date"}},
+    {"name": "last_login", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "tags", "type": {"type": "array", "items": "string"}},
+    {"name": "address", "type": {
+      "type": "record",
+      "name": "Address",
+      "fields": [
+        {"name": "city", "type": "string"},
+        {"name": "zip", "type": "string"}
+      ]
+    }}
+  ]
+}
