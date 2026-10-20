@@ -2,16 +2,28 @@
 
 Parquet 파일을 관리하는 커맨드 및 JAR 파일을 RPM으로 빌드하는 프로젝트입니다.
 
+upstream `parquet-cli`는 INT96 타임스탬프 컬럼이 있는 파일을 읽지 못하므로, 이 프로젝트는 INT96을 기본으로 읽고 날짜/시간으로 보여 주도록 수정한 `parquet-cli`를 제공합니다.
+
 본 프로젝트의 소스코드로 RPM을 빌드하기 위해서는 리눅스가 필요하며 Ubuntu에서 RPM 파일을 생성하려면 `rpm`을 설치하기 바랍니다.
 
 ## Requirement
 
 * JDK 17
+* 빌드: Parquet 소스에 포함된 Maven Wrapper(`./mvnw`, Maven 3.9 이상)와 Thrift 컴파일러 0.23.0 (`build.sh`가 `thrift-0.23.0/`을 빌드)
+
+## 소스 구성
+
+| 디렉터리 | 설명 |
+|---|---|
+| `parquet-1.18.1/` | 현재 빌드 대상. upstream 1.18.1 소스에 INT96 지원 수정을 적용 |
+| `parquet-1.17.0/` | 이전 버전 소스 (릴리스 `v1.17.0-1`) |
+| `thrift-0.23.0/`, `thrift-0.22.0/` | 각각 Parquet 1.18.1, 1.17.0 빌드에 필요한 Thrift 소스 |
+| `rpm/` | RPM 스펙, 실행 스크립트, 런타임 JAR, 빌드된 RPM |
 
 ## Parquet 버전별 주요 변경 사항
 
-이 프로젝트는 Parquet 1.17.0을 기반으로 합니다. 1.12부터 최신 버전까지의 주요 기능 변화를 요약하면 다음과 같습니다.
-(출처: [CHANGES.md](parquet-1.17.0/CHANGES.md), [apache/parquet-java Releases](https://github.com/apache/parquet-java/releases))
+이 프로젝트는 Parquet 1.18.1을 기반으로 합니다. 1.12부터 최신 버전까지의 주요 기능 변화를 요약하면 다음과 같습니다.
+(출처: [CHANGES.md](parquet-1.18.1/CHANGES.md), [apache/parquet-java Releases](https://github.com/apache/parquet-java/releases))
 
 | 버전 | 주요 변경 사항 |
 |---|---|
@@ -30,8 +42,18 @@ Parquet 파일을 관리하는 커맨드 및 JAR 파일을 RPM으로 빌드하�
 
 ## INT96 타임스탬프 읽기
 
-INT96 컬럼을 FIXED(12바이트)로 읽으려면 다음과 같이 실행합니다.
+INT96 컬럼은 별도 옵션 없이 읽히며, `cat`/`head` 출력에서 UTC 기준 ISO-8601 타임스탬프로 표시됩니다.
 
 ```
-JAVA_OPTS="-Dparquet.avro.readInt96AsFixed=true" parquet cat <file>
+$ parquet cat events.parquet
+{"id": 1, "ts": "2024-01-01T09:30:00.123456789Z", "ev": {"name": "login", "at": "2024-01-02T00:00:00Z"}}
 ```
+
+upstream과 같이 INT96 컬럼을 읽지 않으려면 옵션을 끕니다.
+
+```
+JAVA_OPTS="-Dparquet.avro.readInt96AsFixed=false" parquet cat <file>
+parquet -D parquet.avro.readInt96AsFixed=false cat <file>
+```
+
+`to-avro`, `convert` 등 파일을 쓰는 명령은 INT96 값을 12바이트 FIXED 값 그대로 기록합니다.

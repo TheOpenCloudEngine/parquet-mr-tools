@@ -1,0 +1,81 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.parquet.hadoop.thrift;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.UUID;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
+import org.apache.parquet.schema.Types;
+import org.apache.parquet.thrift.ThriftParquetReader;
+import org.apache.parquet.thrift.ThriftParquetWriter;
+import org.apache.parquet.thrift.test.binary.StringAndBinary;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+public class TestBinary {
+  @TempDir
+  private java.nio.file.Path tempDir;
+
+  @Test
+  public void testBinary() throws IOException {
+    StringAndBinary expected = new StringAndBinary("test", ByteBuffer.wrap(new byte[] {-123, 20, 33}));
+    Path path = new Path(tempDir.resolve(UUID.randomUUID().toString()).toUri());
+
+    ThriftParquetWriter<StringAndBinary> writer =
+        new ThriftParquetWriter<StringAndBinary>(path, StringAndBinary.class, CompressionCodecName.SNAPPY);
+    writer.write(expected);
+    writer.close();
+
+    ParquetReader<StringAndBinary> reader = ThriftParquetReader.<StringAndBinary>build(path)
+        .withThriftClass(StringAndBinary.class)
+        .build();
+
+    StringAndBinary record = reader.read();
+    reader.close();
+
+    assertSchema(ParquetFileReader.readFooter(new Configuration(), path));
+    assertThat(record).as("Should match after serialization round trip").isEqualTo(expected);
+  }
+
+  private void assertSchema(ParquetMetadata parquetMetadata) {
+    List<Type> fields = parquetMetadata.getFileMetaData().getSchema().getFields();
+    assertThat(fields).hasSize(2);
+    assertThat(fields.get(0))
+        .isEqualTo(Types.required(PrimitiveType.PrimitiveTypeName.BINARY)
+            .as(OriginalType.UTF8)
+            .id(1)
+            .named("s"));
+    assertThat(fields.get(1))
+        .isEqualTo(Types.required(PrimitiveType.PrimitiveTypeName.BINARY)
+            .id(2)
+            .named("b"));
+  }
+}

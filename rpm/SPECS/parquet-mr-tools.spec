@@ -1,5 +1,5 @@
 Name:           parquet-mr-tools
-Version:        1.17.0
+Version:        1.18.1
 Release:        1%{?dist}
 Summary:        Parquet File CLI (Powered By Parquet MR)
 BuildArch:      noarch

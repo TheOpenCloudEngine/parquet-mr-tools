@@ -1,0 +1,24 @@
+*.class
+.project
+.classpath
+.factorypath
+.settings
+target
+# Package Files #
+*.jar
+*.war
+*.ear
+*.iml
+*.ipr
+*.iws
+*.orig
+*.rej
+dependency-reduced-pom.xml
+.idea/*
+target/
+.cache
+*~
+mvn_install.log
+.vscode/*
+.DS_Store
+

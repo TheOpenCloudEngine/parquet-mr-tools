@@ -1,0 +1,85 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.parquet.cli.commands;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import org.apache.hadoop.conf.Configuration;
+import org.junit.jupiter.api.Test;
+
+public class ConvertCommandTest extends AvroFileTest {
+  @Test
+  public void testConvertCommand() throws IOException {
+    File file = toAvro(parquetFile());
+    ConvertCommand command = new ConvertCommand(createLogger());
+    command.targets = Arrays.asList(file.getAbsolutePath());
+    File output = new File(getTempFolder(), "converted.avro");
+    command.outputPath = output.getAbsolutePath();
+    command.setConf(new Configuration());
+    assertThat(command.run()).isZero();
+    assertThat(output).exists();
+  }
+
+  @Test
+  public void testConvertCommandWithGenericConf() throws IOException {
+    File file = toAvro(parquetFile());
+    ConvertCommand command = new ConvertCommand(createLogger());
+    command.targets = Arrays.asList(file.getAbsolutePath());
+    File output = new File(getTempFolder(), "converted_with_generic_conf.parquet");
+    command.outputPath = output.getAbsolutePath();
+    Configuration conf = new Configuration();
+    conf.set("parquet.avro.write-parquet-uuid", "true");
+    conf.set("parquet.avro.write-old-list-structure", "false");
+    conf.set("test.property", "test.value");
+    command.setConf(conf);
+
+    assertThat(command.run()).isZero();
+    assertThat(output).exists();
+  }
+
+  @Test
+  public void testConvertCommandConfigurationValidation() throws IOException {
+    File file = toAvro(parquetFile());
+    ConvertCommand command = new ConvertCommand(createLogger());
+    command.targets = Arrays.asList(file.getAbsolutePath());
+    File output = new File(getTempFolder(), "converted_with_config_validation.parquet");
+    command.outputPath = output.getAbsolutePath();
+
+    Configuration conf = new Configuration();
+    conf.set("parquet.avro.write-parquet-uuid", "true");
+    conf.set("parquet.avro.write-old-list-structure", "false");
+    command.setConf(conf);
+
+    assertThat(command.run()).isZero();
+    assertThat(output).exists();
+
+    File output2 = new File(getTempFolder(), "converted_with_config_validation2.parquet");
+    command.outputPath = output2.getAbsolutePath();
+    Configuration conf2 = new Configuration();
+    conf2.set("parquet.avro.write-parquet-uuid", "false");
+    conf2.set("parquet.avro.write-old-list-structure", "true");
+    command.setConf(conf2);
+
+    assertThat(command.run()).isZero();
+    assertThat(output2).exists();
+  }
+}

@@ -1,0 +1,217 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.parquet.hadoop;
+
+import static org.apache.parquet.schema.MessageTypeParser.parseMessageType;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.example.data.Group;
+import org.apache.parquet.example.data.simple.SimpleGroupFactory;
+import org.apache.parquet.format.converter.ParquetMetadataConverter;
+import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel;
+import org.apache.parquet.hadoop.example.ExampleParquetWriter;
+import org.apache.parquet.hadoop.example.GroupWriteSupport;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.schema.MessageType;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+public class TestMergeMetadataFiles {
+  @TempDir
+  private java.nio.file.Path tempDir;
+
+  private static final MessageType schema = parseMessageType("message test { "
+      + "required binary binary_field; "
+      + "required int32 int32_field; "
+      + "required int64 int64_field; "
+      + "required boolean boolean_field; "
+      + "required float float_field; "
+      + "required double double_field; "
+      + "required fixed_len_byte_array(3) flba_field; "
+      + "required int96 int96_field; "
+      + "} ");
+
+  // schema1 with a field removed
+  private static final MessageType schema2 = parseMessageType("message test { "
+      + "required binary binary_field; "
+      + "required int32 int32_field; "
+      + "required int64 int64_field; "
+      + "required boolean boolean_field; "
+      + "required float float_field; "
+      + "required double double_field; "
+      + "required fixed_len_byte_array(3) flba_field; "
+      + "} ");
+
+  private static void writeFile(Path out, Configuration conf, boolean useSchema2) throws IOException {
+    if (!useSchema2) {
+      GroupWriteSupport.setSchema(schema, conf);
+    } else {
+      GroupWriteSupport.setSchema(schema2, conf);
+    }
+    SimpleGroupFactory f = new SimpleGroupFactory(schema);
+
+    Map<String, String> extraMetaData = new HashMap<String, String>();
+    extraMetaData.put("schema_num", useSchema2 ? "2" : "1");
+
+    ParquetWriter<Group> writer = ExampleParquetWriter.builder(out)
+        .withConf(conf)
+        .withExtraMetaData(extraMetaData)
+        .build();
+
+    for (int i = 0; i < 1000; i++) {
+      Group g = f.newGroup()
+          .append("binary_field", "test" + i)
+          .append("int32_field", i)
+          .append("int64_field", (long) i)
+          .append("boolean_field", i % 2 == 0)
+          .append("float_field", (float) i)
+          .append("double_field", (double) i)
+          .append("flba_field", "foo");
+
+      if (!useSchema2) {
+        g = g.append("int96_field", Binary.fromConstantByteArray(new byte[12]));
+      }
+
+      writer.write(g);
+    }
+    writer.close();
+  }
+
+  private static class WrittenFileInfo {
+    public Configuration conf;
+    public Path metaPath1;
+    public Path metaPath2;
+    public Path commonMetaPath1;
+    public Path commonMetaPath2;
+  }
+
+  private WrittenFileInfo writeFiles(boolean mixedSchemas) throws Exception {
+    WrittenFileInfo info = new WrittenFileInfo();
+    Configuration conf = new Configuration();
+    info.conf = conf;
+
+    Path rootPath1 = new Path(tempDir.resolve("out1").toUri());
+    Path rootPath2 = new Path(tempDir.resolve("out2").toUri());
+
+    for (int i = 0; i < 10; i++) {
+      writeFile(new Path(rootPath1, i + ".parquet"), conf, true);
+    }
+
+    List<Footer> footers = ParquetFileReader.readFooters(
+        conf, rootPath1.getFileSystem(conf).getFileStatus(rootPath1), false);
+    ParquetFileWriter.writeMetadataFile(conf, rootPath1, footers, JobSummaryLevel.ALL);
+
+    for (int i = 0; i < 7; i++) {
+      writeFile(new Path(rootPath2, i + ".parquet"), conf, !mixedSchemas);
+    }
+
+    footers = ParquetFileReader.readFooters(
+        conf, rootPath2.getFileSystem(conf).getFileStatus(rootPath2), false);
+    ParquetFileWriter.writeMetadataFile(conf, rootPath2, footers, JobSummaryLevel.ALL);
+
+    info.commonMetaPath1 = new Path(rootPath1, ParquetFileWriter.PARQUET_COMMON_METADATA_FILE);
+    info.commonMetaPath2 = new Path(rootPath2, ParquetFileWriter.PARQUET_COMMON_METADATA_FILE);
+    info.metaPath1 = new Path(rootPath1, ParquetFileWriter.PARQUET_METADATA_FILE);
+    info.metaPath2 = new Path(rootPath2, ParquetFileWriter.PARQUET_METADATA_FILE);
+
+    return info;
+  }
+
+  @Test
+  public void testMergeMetadataFiles() throws Exception {
+    WrittenFileInfo info = writeFiles(false);
+
+    ParquetMetadata commonMeta1 =
+        ParquetFileReader.readFooter(info.conf, info.commonMetaPath1, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata commonMeta2 =
+        ParquetFileReader.readFooter(info.conf, info.commonMetaPath2, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata meta1 =
+        ParquetFileReader.readFooter(info.conf, info.metaPath1, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata meta2 =
+        ParquetFileReader.readFooter(info.conf, info.metaPath2, ParquetMetadataConverter.NO_FILTER);
+
+    assertThat(commonMeta1.getBlocks()).isEmpty();
+    assertThat(commonMeta2.getBlocks()).isEmpty();
+    assertThat(commonMeta2.getFileMetaData().getSchema())
+        .isEqualTo(commonMeta1.getFileMetaData().getSchema());
+
+    assertThat(meta1.getBlocks()).isNotEmpty();
+    assertThat(meta2.getBlocks()).isNotEmpty();
+    assertThat(meta2.getFileMetaData().getSchema())
+        .isEqualTo(meta1.getFileMetaData().getSchema());
+
+    assertThat(commonMeta2.getFileMetaData().getKeyValueMetaData())
+        .isEqualTo(commonMeta1.getFileMetaData().getKeyValueMetaData());
+    assertThat(meta2.getFileMetaData().getKeyValueMetaData())
+        .isEqualTo(meta1.getFileMetaData().getKeyValueMetaData());
+
+    // test file serialization
+    Path mergedOut = new Path(tempDir.resolve("merged_meta").toUri());
+    Path mergedCommonOut = new Path(tempDir.resolve("merged_common_meta").toUri());
+    ParquetFileWriter.writeMergedMetadataFile(List.of(info.metaPath1, info.metaPath2), mergedOut, info.conf);
+    ParquetFileWriter.writeMergedMetadataFile(
+        List.of(info.commonMetaPath1, info.commonMetaPath2), mergedCommonOut, info.conf);
+
+    ParquetMetadata mergedMeta =
+        ParquetFileReader.readFooter(info.conf, mergedOut, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata mergedCommonMeta =
+        ParquetFileReader.readFooter(info.conf, mergedCommonOut, ParquetMetadataConverter.NO_FILTER);
+
+    // ideally we'd assert equality here, but BlockMetaData and it's references don't implement equals
+    assertThat(mergedMeta.getBlocks())
+        .hasSize(meta1.getBlocks().size() + meta2.getBlocks().size());
+    assertThat(mergedCommonMeta.getBlocks()).isEmpty();
+
+    assertThat(mergedMeta.getFileMetaData().getSchema())
+        .isEqualTo(meta1.getFileMetaData().getSchema());
+    assertThat(mergedCommonMeta.getFileMetaData().getSchema())
+        .isEqualTo(commonMeta1.getFileMetaData().getSchema());
+
+    assertThat(mergedMeta.getFileMetaData().getKeyValueMetaData())
+        .isEqualTo(meta1.getFileMetaData().getKeyValueMetaData());
+    assertThat(mergedCommonMeta.getFileMetaData().getKeyValueMetaData())
+        .isEqualTo(commonMeta1.getFileMetaData().getKeyValueMetaData());
+  }
+
+  @Test
+  public void testThrowsWhenIncompatible() throws Exception {
+    WrittenFileInfo info = writeFiles(true);
+
+    Path mergedOut = new Path(tempDir.resolve("merged_meta").toUri());
+    Path mergedCommonOut = new Path(tempDir.resolve("merged_common_meta").toUri());
+
+    assertThatThrownBy(() -> ParquetFileWriter.writeMergedMetadataFile(
+            List.of(info.metaPath1, info.metaPath2), mergedOut, info.conf))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("could not merge metadata: key schema_num has conflicting values");
+
+    assertThatThrownBy(() -> ParquetFileWriter.writeMergedMetadataFile(
+            List.of(info.commonMetaPath1, info.commonMetaPath2), mergedCommonOut, info.conf))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("could not merge metadata: key schema_num has conflicting values");
+  }
+}
