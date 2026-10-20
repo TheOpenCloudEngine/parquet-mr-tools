@@ -8,8 +8,9 @@ upstream `parquet-cli`는 INT96 타임스탬프 컬럼이 있는 파일을 읽�
 
 ## Requirement
 
-* JDK 17
-* 빌드: Parquet 소스에 포함된 Maven Wrapper(`./mvnw`, Maven 3.9 이상)와 Thrift 컴파일러 0.23.0 (`build.sh`가 `thrift-0.23.0/`을 빌드)
+* JDK 17 이상
+* Maven 3.9 이상 (Parquet 소스에 포함된 Maven Wrapper `./mvnw`를 사용하면 별도 설치 불필요)
+* Thrift 컴파일러 0.23.0 (`build.sh`가 `thrift-0.23.0/`을 빌드)
 
 ## 소스 구성
 
