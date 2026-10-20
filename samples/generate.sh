@@ -1,13 +1,13 @@
 #!/bin/sh
 #
 # Regenerates the sample Avro/Parquet files from users.avsc, users.json and Int96Sample.java.
-# Requires the parquet-mr-tools RPM (parquet, avro commands) and JDK 17+.
+# Requires the parquet-avro-tools RPM (parquet, avro commands) and JDK 17+.
 
 set -e
 
 cd "$(dirname "$0")"
 
-PARQUET_LIB="${PARQUET_LIB:-/opt/parquet-mr-tools/lib}"
+PARQUET_LIB="${PARQUET_LIB:-/opt/parquet-avro-tools/lib}"
 
 rm -f users.avro users.parquet users_from_csv.parquet events_int96.parquet
 

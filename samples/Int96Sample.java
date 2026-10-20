@@ -16,7 +16,7 @@ import org.apache.parquet.schema.MessageTypeParser;
  * The event_type column also gets a bloom filter, which the parquet CLI cannot write itself.
  *
  * <pre>
- * java -cp "/opt/parquet-mr-tools/lib/*" Int96Sample.java events_int96.parquet
+ * java -cp "/opt/parquet-avro-tools/lib/*" Int96Sample.java events_int96.parquet
  * </pre>
  */
 public class Int96Sample {

@@ -3,7 +3,7 @@
 `avro`는 Avro 데이터 파일의 스키마와 데이터를 조회하고, JSON과 서로 변환하거나 압축 코덱을 바꾸는 명령입니다.
 Apache Avro 1.12.2의 `avro-tools`를 그대로 빌드한 것입니다.
 
-이 문서의 모든 예시는 저장소의 [`samples/`](samples/) 파일로 실제로 실행한 결과입니다(JDK 17, `parquet-mr-tools-1.18.1-1` RPM).
+이 문서의 모든 예시는 저장소의 [`samples/`](samples/) 파일로 실제로 실행한 결과입니다(JDK 17, `parquet-avro-tools-1.18.1-2` RPM).
 명령은 저장소 루트에서 실행했고, 결과 파일은 `out/` 디렉터리에 썼습니다. 샘플 파일 설명은 [parquet.md의 샘플 파일](parquet.md#샘플-파일)을 참고하세요.
 
 ```

@@ -3,7 +3,7 @@
 `parquet`는 Parquet 파일의 스키마, 데이터, 메타데이터를 조회하고 Avro/CSV와 서로 변환하는 명령입니다.
 Apache Parquet 1.18.1의 `parquet-cli`에 INT96 타임스탬프 지원을 추가한 버전입니다.
 
-이 문서의 모든 예시는 저장소의 [`samples/`](samples/) 파일로 실제로 실행한 결과입니다(JDK 17, `parquet-mr-tools-1.18.1-1` RPM).
+이 문서의 모든 예시는 저장소의 [`samples/`](samples/) 파일로 실제로 실행한 결과입니다(JDK 17, `parquet-avro-tools-1.18.1-2` RPM).
 명령은 저장소 루트에서 실행했고, 결과 파일은 `out/` 디렉터리에 썼습니다.
 
 ```

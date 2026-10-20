@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CLASSPATH="/opt/parquet-mr-tools/lib/*"
+CLASSPATH="/opt/parquet-avro-tools/lib/*"
 
 # JAVA_OPTS is intentionally unquoted so multiple options are split into separate arguments
 exec java $JAVA_OPTS -cp "$CLASSPATH" org.apache.parquet.cli.Main "$@"

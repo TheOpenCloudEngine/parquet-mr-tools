@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # avro-tools is a shaded jar bundling its own Hadoop, so keep it off the parquet classpath
-CLASSPATH="/opt/parquet-mr-tools/avro/*"
+CLASSPATH="/opt/parquet-avro-tools/avro/*"
 
 # JAVA_OPTS is intentionally unquoted so multiple options are split into separate arguments
 exec java $JAVA_OPTS -cp "$CLASSPATH" org.apache.avro.tool.Main "$@"
