@@ -8,6 +8,26 @@ Parquet 파일을 관리하는 커맨드 및 JAR 파일을 RPM으로 빌드하�
 
 * JDK 17
 
+## Parquet 버전별 주요 변경 사항
+
+이 프로젝트는 Parquet 1.17.0을 기반으로 합니다. 1.12부터 최신 버전까지의 주요 기능 변화를 요약하면 다음과 같습니다.
+(출처: [CHANGES.md](parquet-1.17.0/CHANGES.md), [apache/parquet-java Releases](https://github.com/apache/parquet-java/releases))
+
+| 버전 | 주요 변경 사항 |
+|---|---|
+| 1.12 | Bloom filter 지원, 컬럼 암호화(Encryption) 및 키 관리 도구, ZSTD를 JNI(zstd-jni)로 교체, CLI에 `prune`, `column-size` 명령 추가 |
+| 1.13 | LZ4_RAW 코덱 지원, Bloom filter 병합 및 FPP 설정, 컬럼 인덱스/통계 truncation, CLI에 `scan`, `bloom-filter` 명령 추가, Hadoop 3.2 기반 |
+| 1.14 | Hadoop 없이 Parquet 사용 가능, Vectored IO 구현, FLOAT16 타입, BYTE_STREAM_SPLIT의 INT32/INT64/FIXED_LEN_BYTE_ARRAY 지원, 전체 컬럼 암호화, CLI `rewrite --overwrite` |
+| 1.15 | 배열 컬럼용 `contains` 필터, 컬럼별 통계 비활성화, Parquet joiner v2, ParquetRewriter 컬럼 이름 변경, `parquet-scala` 제거, CLI 압축 코덱 이름 대소문자 무시 |
+| 1.15.1 / 1.15.2 | parquet-avro의 역직렬화 허용 패키지/클래스 제한 (보안 수정), DictionaryFilter의 null 값 처리 버그 수정 |
+| 1.16 | Variant 타입 읽기/쓰기, Geometry/Geography 타입, Vectored IO 기본 활성화, Hadoop 2 지원 제거, Pig 연동 deprecated, 중첩 타입의 INT96 읽기 버그 수정, CLI `size-stats`, `version` 명령 추가 |
+| 1.17 | **최소 Java 11**, 순수 Parquet 파일 `cat` 지원, 암호화된 파일의 CLI 명령 지원, CLI 파일 기반 설정 통합, CLI의 Protobuf 지원, INT32/INT64 decimal의 Avro 읽기, 잘못된 통계가 있어도 읽기 실패하지 않도록 개선 |
+| 1.17.1 | Protobuf `UInt32Value` 읽기 버그 수정 |
+| 1.18 | Pig 연동 제거, 컬럼별 압축 코덱 지정, 부동소수점 컬럼의 IEEE 754 total order 통계와 NaN 개수 기록(기본 적용), 리더에서 row group 인덱스 제공, JSON → Variant 변환, 알 수 없는(향후) logical type이 있는 파일도 읽기 가능, CLI `column-size` 크기순 정렬, LZ4_RAW 해제 및 딕셔너리 재사용 시 데이터 손상 버그 수정, Java 17 초과 버전 호환성 수정 |
+| 1.18.1 | 힙 외부(direct) ByteBuffer 값 읽기 시 데이터 손상 버그 수정, 키 material에서 KMS URL을 읽는 옵션 추가 |
+
+> 2026-10-20 기준 최신 정식 버전은 1.18.1이며, 1.19.0은 아직 RC 단계입니다.
+
 ## INT96 타임스탬프 읽기
 
 INT96 컬럼을 FIXED(12바이트)로 읽으려면 다음과 같이 실행합니다.
