@@ -27,6 +27,7 @@ RPM을 설치하면 다음 두 명령을 사용할 수 있습니다.
 
 * [parquet 명령 사용법](parquet.md): 스키마/데이터/메타데이터 조회, 날짜/시간 표시와 시간대, INT96 타임스탬프, Bloom filter, Avro/CSV 변환, 컬럼 제거·마스킹·압축 변경, bash 자동 완성
 * [avro 명령 사용법](avro.md): 스키마/메타데이터 조회, JSON 변환, 레코드 추출·합치기, 압축 코덱 변경, 스키마 도구, bash 자동 완성
+* [Parquet Timestamp와 시간대](timezone.md): NiFi, Impala, Spark에서 timestamp가 다르게(UTC 또는 현지 시간으로) 보이는 이유와 대응 방법
 
 ## 설치
 
