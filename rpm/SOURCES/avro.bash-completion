@@ -1,0 +1,56 @@
+# bash completion for the avro command (parquet-avro-tools)
+
+_avro_tools="canonical cat compile concat count fingerprint fragtojson fromjson fromtext getmeta getschema idl
+idl2schemata induce jsontofrag random recodec repair rpcprotocol rpcreceive rpcsend tether tojson totext totrevni
+trevni_meta trevni_random trevni_tojson"
+
+_avro_codecs="null deflate snappy bzip2 xz zstandard"
+
+_avro_tool_options() {
+  case "$1" in
+    cat) echo "--offset --limit --samplerate" ;;
+    fingerprint) echo "--fingerprint" ;;
+    fragtojson) echo "--schema-file --no-pretty" ;;
+    fromjson) echo "--schema --schema-file --codec --level" ;;
+    fromtext | recodec | totrevni) echo "--codec --level" ;;
+    getmeta) echo "--key" ;;
+    idl2schemata) echo "--use" ;;
+    jsontofrag) echo "--schema-file" ;;
+    random) echo "--schema --schema-file --count --seed --codec --level" ;;
+    tojson) echo "--pretty --head --reader-schema --reader-schema-file" ;;
+  esac
+}
+
+_avro() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local prev="${COMP_WORDS[COMP_CWORD - 1]}"
+
+  if [[ "$COMP_CWORD" -eq 1 ]]; then
+    COMPREPLY=($(compgen -W "$_avro_tools" -- "$cur"))
+    return
+  fi
+
+  local tool="${COMP_WORDS[1]}"
+  case "$prev" in
+    --codec)
+      COMPREPLY=($(compgen -W "$_avro_codecs" -- "$cur"))
+      return
+      ;;
+    --fingerprint)
+      COMPREPLY=($(compgen -W "CRC-64-AVRO MD5 SHA-256" -- "$cur"))
+      return
+      ;;
+  esac
+
+  if [[ "$tool" == compile && "$COMP_CWORD" -eq 2 && "$cur" != -* ]]; then
+    COMPREPLY=($(compgen -W "schema protocol" -- "$cur"))
+    return
+  fi
+
+  # Options of the tool; anything else falls back to file name completion
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=($(compgen -W "$(_avro_tool_options "$tool")" -- "$cur"))
+  fi
+}
+
+complete -o default -F _avro avro

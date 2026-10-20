@@ -1,0 +1,96 @@
+# bash completion for the parquet command (parquet-avro-tools)
+
+_parquet_commands="help version meta pages dictionary check-stats schema csv-schema convert-csv convert to-avro cat head
+column-index column-size prune trans-compression masking footer bloom-filter scan rewrite size-stats geospatial-stats"
+
+_parquet_global_options="-v --verbose --debug --conf --property --config-file -D"
+
+_parquet_codecs="uncompressed snappy gzip lzo brotli lz4 lz4_raw zstd"
+
+_parquet_command_options() {
+  case "$1" in
+    pages) echo "-c --column --columns -r --raw" ;;
+    dictionary) echo "-c --column" ;;
+    schema) echo "-o --output --overwrite --parquet" ;;
+    csv-schema) echo "--class --record-name -o --output --delimiter --escape --quote --header --no-header --skip-lines
+      --require --minimize --charset" ;;
+    convert-csv) echo "-o --output -s --schema --overwrite --delimiter --escape --quote --header --no-header --skip-lines
+      --require --compression-codec --row-group-size --page-size --dictionary-size --charset" ;;
+    convert) echo "-o --output -s --schema -c --column --columns --overwrite --compression-codec --row-group-size
+      --page-size --dictionary-size --bloom-filter-columns" ;;
+    to-avro) echo "-o --output -s --schema -c --column --columns --overwrite --compression-codec --int96-as-timestamp" ;;
+    cat | head) echo "-n --num-records -c --column --columns" ;;
+    column-index) echo "-r --row-group -c --column -i --column-index -o --offset-index" ;;
+    column-size) echo "-p --percentage -s --sort -c --column --columns" ;;
+    prune) echo "-i --input -o --output -c --columns" ;;
+    trans-compression) echo "-o --output -c --compression-codec" ;;
+    masking) echo "-i --input -o --output -c --columns -m --mode" ;;
+    footer) echo "-r --raw" ;;
+    bloom-filter) echo "-c --column -v --values" ;;
+    scan) echo "-c --column --columns" ;;
+    rewrite) echo "-i --input -o --output --overwrite --prune-columns --mask-columns --mask-mode -c --compression-codec" ;;
+    size-stats) echo "-r --row-group --row-groups -c --column --columns" ;;
+  esac
+}
+
+_parquet() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local prev="${COMP_WORDS[COMP_CWORD - 1]}"
+  local cmd="" word i
+
+  # The command is the first word that is not an option or the value of a global option
+  for ((i = 1; i < COMP_CWORD; i++)); do
+    word="${COMP_WORDS[i]}"
+    case "$word" in
+      --conf | --property | --config-file | -D) ((i++)) ;;
+      # bash splits key=value into key, = and value
+      =) ((i++)) ;;
+      -*) ;;
+      *)
+        cmd="$word"
+        break
+        ;;
+    esac
+  done
+
+  if [[ -z "$cmd" ]]; then
+    case "$prev" in
+      --conf | --property | -D | =) return ;;
+    esac
+    if [[ "$cur" == -* ]]; then
+      COMPREPLY=($(compgen -W "$_parquet_global_options" -- "$cur"))
+    elif [[ "$prev" != --config-file ]]; then
+      COMPREPLY=($(compgen -W "$_parquet_commands" -- "$cur"))
+    fi
+    return
+  fi
+
+  if [[ "$cmd" == help ]]; then
+    COMPREPLY=($(compgen -W "$_parquet_commands" -- "$cur"))
+    return
+  fi
+
+  case "$prev" in
+    --compression-codec)
+      COMPREPLY=($(compgen -W "$_parquet_codecs" -- "$cur"))
+      return
+      ;;
+    -c)
+      if [[ "$cmd" == trans-compression || "$cmd" == rewrite ]]; then
+        COMPREPLY=($(compgen -W "$_parquet_codecs" -- "$cur"))
+        return
+      fi
+      ;;
+    -m | --mode | --mask-mode)
+      COMPREPLY=($(compgen -W "nullify" -- "$cur"))
+      return
+      ;;
+  esac
+
+  # Options of the command; anything else falls back to file name completion
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=($(compgen -W "$(_parquet_command_options "$cmd")" -- "$cur"))
+  fi
+}
+
+complete -o default -F _parquet parquet
