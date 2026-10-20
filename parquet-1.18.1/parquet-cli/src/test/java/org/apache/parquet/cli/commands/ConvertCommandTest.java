@@ -24,6 +24,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.column.values.bloomfilter.BloomFilter;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.io.api.Binary;
 import org.junit.jupiter.api.Test;
 
 public class ConvertCommandTest extends AvroFileTest {
@@ -37,6 +43,35 @@ public class ConvertCommandTest extends AvroFileTest {
     command.setConf(new Configuration());
     assertThat(command.run()).isZero();
     assertThat(output).exists();
+  }
+
+  @Test
+  public void testConvertCommandWithBloomFilter() throws IOException {
+    File file = toAvro(parquetFile());
+    ConvertCommand command = new ConvertCommand(createLogger());
+    command.targets = Arrays.asList(file.getAbsolutePath());
+    File output = new File(getTempFolder(), "converted_with_bloom_filter.parquet");
+    command.outputPath = output.getAbsolutePath();
+    command.bloomFilterColumns = Arrays.asList(BINARY_FIELD);
+    command.setConf(new Configuration());
+    assertThat(command.run()).isZero();
+
+    try (ParquetFileReader reader = ParquetFileReader.open(
+        HadoopInputFile.fromPath(new Path(output.getAbsolutePath()), new Configuration()))) {
+      for (ColumnChunkMetaData column :
+          reader.getFooter().getBlocks().get(0).getColumns()) {
+        BloomFilter bloomFilter = reader.readBloomFilter(column);
+        if (column.getPath().toDotString().equals(BINARY_FIELD)) {
+          assertThat(bloomFilter).isNotNull();
+          assertThat(bloomFilter.findHash(bloomFilter.hash(Binary.fromString(COLORS[0]))))
+              .isTrue();
+          assertThat(bloomFilter.findHash(bloomFilter.hash(Binary.fromString("PURPLE"))))
+              .isFalse();
+        } else {
+          assertThat(bloomFilter).isNull();
+        }
+      }
+    }
   }
 
   @Test

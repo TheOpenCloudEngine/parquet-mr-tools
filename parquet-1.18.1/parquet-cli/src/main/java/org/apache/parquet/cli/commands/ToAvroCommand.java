@@ -38,6 +38,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.io.DatumWriter;
 import org.apache.parquet.cli.BaseCommand;
 import org.apache.parquet.cli.util.Codecs;
+import org.apache.parquet.cli.util.Int96Values;
 import org.apache.parquet.cli.util.Schemas;
 import org.slf4j.Logger;
 
@@ -77,6 +78,12 @@ public class ToAvroCommand extends BaseCommand {
       description = "Overwrite the output file if it exists")
   boolean overwrite = false;
 
+  @Parameter(
+      names = {"--int96-as-timestamp"},
+      description = "Write INT96 columns as Avro timestamp-micros instead of 12-byte fixed values "
+          + "(digits below microseconds are dropped)")
+  boolean int96AsTimestamp = false;
+
   @Override
   @SuppressWarnings("unchecked")
   public int run() throws IOException {
@@ -94,6 +101,7 @@ public class ToAvroCommand extends BaseCommand {
     }
 
     final Schema projection = filterSchema(schema, columns);
+    final Schema outputSchema = int96AsTimestamp ? Int96Values.toTimestampSchema(projection) : projection;
     Iterable<Record> reader = openDataFile(source, projection);
     boolean threw = true;
     long count = 0;
@@ -102,8 +110,11 @@ public class ToAvroCommand extends BaseCommand {
     try (DataFileWriter<Record> fileWriter = new DataFileWriter<>(datumWriter)) {
       fileWriter.setCodec(codecFactory);
       try (OutputStream os = overwrite ? create(outputPath) : createWithNoOverwrite(outputPath);
-          DataFileWriter<Record> writer = fileWriter.create(projection, os)) {
+          DataFileWriter<Record> writer = fileWriter.create(outputSchema, os)) {
         for (Record record : reader) {
+          if (int96AsTimestamp) {
+            record = (Record) Int96Values.toTimestampDatum(record, projection, outputSchema);
+          }
           writer.append(record);
           count += 1;
         }

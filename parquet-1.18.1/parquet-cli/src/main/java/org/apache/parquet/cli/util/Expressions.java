@@ -38,6 +38,46 @@ public class Expressions {
     return select(schema, datum, Lists.newArrayList(parse(path)));
   }
 
+  /**
+   * Returns the schema of the value that {@link #select(Schema, Object, String)} returns for the path,
+   * or null if the path cannot be resolved without data.
+   */
+  public static Schema selectSchema(Schema schema, String path) {
+    return selectSchema(schema, Lists.newArrayList(parse(path)));
+  }
+
+  private static Schema selectSchema(Schema schema, List<PathExpr> tokens) {
+    if (tokens.isEmpty()) {
+      return schema;
+    }
+    if (tokens.size() != 1) {
+      return null;
+    }
+    PathExpr token = tokens.get(0);
+    switch (schema.getType()) {
+      case RECORD:
+        Schema.Field field = schema.getField(token.value);
+        return field == null ? null : selectSchema(field.schema(), token.children);
+      case MAP:
+        return selectSchema(schema.getValueType(), token.children);
+      case ARRAY:
+        return selectSchema(schema.getElementType(), token.children);
+      case UNION:
+        Schema nonNull = null;
+        for (Schema type : schema.getTypes()) {
+          if (type.getType() != Schema.Type.NULL) {
+            if (nonNull != null) {
+              return null;
+            }
+            nonNull = type;
+          }
+        }
+        return nonNull == null ? null : selectSchema(nonNull, tokens);
+      default:
+        return null;
+    }
+  }
+
   @SuppressWarnings("unchecked")
   private static Object select(Schema schema, Object datum, List<PathExpr> tokens) {
     if (tokens.isEmpty()) {
@@ -79,6 +119,10 @@ public class Expressions {
         return select(schema.getElementType(), list.get(Integer.parseInt(token.value)), token.children);
 
       case UNION:
+        if (datum == null) {
+          // the parent of the selected value is missing
+          return null;
+        }
         int branch = GenericData.get().resolveUnion(schema, datum);
         return select(schema.getTypes().get(branch), datum, tokens);
 
@@ -228,12 +272,16 @@ public class Expressions {
             schema.getName(), schema.getDoc(), schema.getNamespace(), schema.isError(), fields);
 
       case UNION:
-        // Ignore schemas that are a union with null because there is another token
+        // Filter the non-null branch of a union with null, keeping it nullable so the field default stays valid
         if (schema.getTypes().size() == 2) {
           if (schema.getTypes().get(0).getType() == Schema.Type.NULL) {
-            return filter(schema.getTypes().get(1), exprs);
+            return Schema.createUnion(
+                schema.getTypes().get(0),
+                filter(schema.getTypes().get(1), exprs));
           } else if (schema.getTypes().get(1).getType() == Schema.Type.NULL) {
-            return filter(schema.getTypes().get(0), exprs);
+            return Schema.createUnion(
+                filter(schema.getTypes().get(0), exprs),
+                schema.getTypes().get(1));
           }
         }
 

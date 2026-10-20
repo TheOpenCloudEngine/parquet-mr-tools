@@ -28,6 +28,7 @@ import java.util.Arrays;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroReadSupport;
+import org.apache.parquet.cli.util.RecordFormatter;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroupFactory;
 import org.apache.parquet.hadoop.ParquetWriter;
@@ -138,6 +139,14 @@ public class CatCommandTest extends ParquetFileTest {
     // Reading with a projection converts the requested Avro schema back to Parquet
     cmd.columns = Arrays.asList("ts");
     assertThat(cmd.run()).isZero();
+
+    // A column inside an optional group, including a record where the group is null
+    cmd.columns = Arrays.asList("detail.at");
+    assertThat(cmd.run()).isZero();
+
+    conf.set(RecordFormatter.TIMEZONE, "Asia/Seoul");
+    cmd.columns = null;
+    assertThat(cmd.run()).isZero();
   }
 
   private static void writeParquetWithInt96(File file) throws IOException {
@@ -146,15 +155,21 @@ public class CatCommandTest extends ParquetFileTest {
         .named("id")
         .required(PrimitiveTypeName.INT96)
         .named("ts")
+        .optionalGroup()
+        .optional(PrimitiveTypeName.INT96)
+        .named("at")
+        .named("detail")
         .named("Int96Record");
 
     try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(file.getAbsolutePath()))
         .withType(schema)
         .build()) {
-      writer.write(new SimpleGroupFactory(schema)
-          .newGroup()
-          .append("id", 1)
-          .append("ts", Binary.fromConstantByteArray(new byte[12])));
+      SimpleGroupFactory factory = new SimpleGroupFactory(schema);
+      Group withDetail =
+          factory.newGroup().append("id", 1).append("ts", Binary.fromConstantByteArray(new byte[12]));
+      withDetail.addGroup("detail").append("at", Binary.fromConstantByteArray(new byte[12]));
+      writer.write(withDetail);
+      writer.write(factory.newGroup().append("id", 2).append("ts", Binary.fromConstantByteArray(new byte[12])));
     }
   }
 

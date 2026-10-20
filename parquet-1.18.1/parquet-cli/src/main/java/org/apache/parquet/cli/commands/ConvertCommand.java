@@ -95,6 +95,12 @@ public class ConvertCommand extends BaseCommand {
   @Parameter(names = "--dictionary-size", description = "Max dictionary page size")
   int dictionaryPageSize = ParquetWriter.DEFAULT_PAGE_SIZE;
 
+  @Parameter(
+      names = "--bloom-filter-columns",
+      description = "Comma-separated columns (dot paths) to write bloom filters for. Dictionary encoding is "
+          + "disabled for these columns because bloom filters are not written for dictionary-encoded columns")
+  List<String> bloomFilterColumns;
+
   @Override
   @SuppressWarnings("unchecked")
   public int run() throws IOException {
@@ -119,21 +125,27 @@ public class ConvertCommand extends BaseCommand {
       outFS.delete(outPath);
     }
 
+    AvroParquetWriter.Builder<Record> builder = AvroParquetWriter.<Record>builder(qualifiedPath(outputPath))
+        .withWriterVersion(v2 ? PARQUET_2_0 : PARQUET_1_0)
+        .withConf(getConf())
+        .withCompressionCodec(codec)
+        .withRowGroupSize(rowGroupSize)
+        .withDictionaryPageSize(dictionaryPageSize < 64 ? 64 : dictionaryPageSize)
+        .withDictionaryEncoding(dictionaryPageSize != 0)
+        .withPageSize(pageSize)
+        .withDataModel(GenericData.get())
+        .withSchema(projection);
+    if (bloomFilterColumns != null) {
+      for (String column : bloomFilterColumns) {
+        builder.withBloomFilterEnabled(column, true).withDictionaryEncoding(column, false);
+      }
+    }
+
     Iterable<Record> reader = openDataFile(source, projection);
     boolean threw = true;
     long count = 0;
     try {
-      try (ParquetWriter<Record> writer = AvroParquetWriter.<Record>builder(qualifiedPath(outputPath))
-          .withWriterVersion(v2 ? PARQUET_2_0 : PARQUET_1_0)
-          .withConf(getConf())
-          .withCompressionCodec(codec)
-          .withRowGroupSize(rowGroupSize)
-          .withDictionaryPageSize(dictionaryPageSize < 64 ? 64 : dictionaryPageSize)
-          .withDictionaryEncoding(dictionaryPageSize != 0)
-          .withPageSize(pageSize)
-          .withDataModel(GenericData.get())
-          .withSchema(projection)
-          .build()) {
+      try (ParquetWriter<Record> writer = builder.build()) {
         for (Record record : reader) {
           writer.write(record);
           count += 1;

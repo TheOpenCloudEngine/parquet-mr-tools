@@ -27,10 +27,27 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import org.apache.avro.LogicalTypes;
+import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileReader;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.parquet.avro.AvroReadSupport;
+import org.apache.parquet.example.data.Group;
+import org.apache.parquet.example.data.simple.SimpleGroupFactory;
+import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.example.ExampleParquetWriter;
+import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.MessageTypeParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -125,5 +142,44 @@ public class ToAvroCommandTest extends AvroFileTest {
     assertThatThrownBy(() -> toAvro(parquetFile, outputFile, false))
         .isInstanceOf(FileAlreadyExistsException.class)
         .hasMessageContaining("File already exists");
+  }
+
+  @Test
+  public void testToAvroCommandWithInt96AsTimestamp() throws IOException {
+    File parquet = new File(getTempFolder(), "int96.parquet");
+    MessageType schema = MessageTypeParser.parseMessageType("message m { required int32 id; optional int96 ts; }");
+    // 2024-01-01T09:30:00.123456789Z
+    byte[] int96 = ByteBuffer.allocate(12)
+        .order(ByteOrder.LITTLE_ENDIAN)
+        .putLong(34200123456789L)
+        .putInt(2460311)
+        .array();
+    SimpleGroupFactory factory = new SimpleGroupFactory(schema);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(
+            new org.apache.hadoop.fs.Path(parquet.getAbsolutePath()))
+        .withType(schema)
+        .build()) {
+      writer.write(factory.newGroup().append("id", 1).append("ts", Binary.fromConstantByteArray(int96)));
+      writer.write(factory.newGroup().append("id", 2));
+    }
+
+    File avro = new File(getTempFolder(), "int96.avro");
+    ToAvroCommand command = new ToAvroCommand(createLogger());
+    command.targets = Arrays.asList(parquet.getAbsolutePath());
+    command.outputPath = avro.getAbsolutePath();
+    command.int96AsTimestamp = true;
+    Configuration conf = new Configuration();
+    conf.setBoolean(AvroReadSupport.READ_INT96_AS_FIXED, true);
+    command.setConf(conf);
+    assertThat(command.run()).isZero();
+
+    try (DataFileReader<GenericRecord> reader = new DataFileReader<>(avro, new GenericDatumReader<>())) {
+      Schema ts = reader.getSchema().getField("ts").schema().getTypes().get(1);
+      assertThat(ts.getType()).isEqualTo(Schema.Type.LONG);
+      assertThat(ts.getLogicalType()).isEqualTo(LogicalTypes.timestampMicros());
+      // digits below microseconds are dropped
+      assertThat(reader.next().get("ts")).isEqualTo(1704101400123456L);
+      assertThat(reader.next().get("ts")).isNull();
+    }
   }
 }

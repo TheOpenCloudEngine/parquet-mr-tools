@@ -62,6 +62,7 @@ import org.apache.parquet.cli.commands.ShowSizeStatisticsCommand;
 import org.apache.parquet.cli.commands.ShowVersionCommand;
 import org.apache.parquet.cli.commands.ToAvroCommand;
 import org.apache.parquet.cli.commands.TransCompressionCommand;
+import org.apache.parquet.cli.util.RecordFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -248,6 +249,11 @@ public class Main extends Configured implements Tool {
     // Hadoop's -D option still takes precedence.
     String readInt96AsFixed = System.getProperty(AvroReadSupport.READ_INT96_AS_FIXED, "true");
     conf.setBoolean(AvroReadSupport.READ_INT96_AS_FIXED, Boolean.parseBoolean(readInt96AsFixed));
+    // Time zone for printing timestamps, for example -Dparquet.cli.timezone=Asia/Seoul
+    String timezone = System.getProperty(RecordFormatter.TIMEZONE);
+    if (timezone != null) {
+      conf.set(RecordFormatter.TIMEZONE, timezone);
+    }
     int rc = ToolRunner.run(conf, new Main(console), args);
     System.exit(rc);
   }

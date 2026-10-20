@@ -32,7 +32,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.apache.parquet.cli.BaseCommand;
 import org.apache.parquet.cli.util.Expressions;
-import org.apache.parquet.cli.util.Int96AwareGenericData;
+import org.apache.parquet.cli.util.RecordFormatter;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
@@ -82,6 +82,10 @@ public class CatCommand extends BaseCommand {
     Schema schema = getAvroSchema(source);
     Schema projection = Expressions.filterSchema(schema, columns);
 
+    RecordFormatter formatter = RecordFormatter.fromTimezone(getConf().get(RecordFormatter.TIMEZONE));
+    Schema columnSchema =
+        columns != null && columns.size() == 1 ? Expressions.selectSchema(projection, columns.get(0)) : null;
+
     Iterable<Object> reader = openDataFile(source, projection);
     boolean threw = true;
     long count = 0;
@@ -91,9 +95,9 @@ public class CatCommand extends BaseCommand {
           break;
         }
         if (columns == null || columns.size() != 1) {
-          console.info(Int96AwareGenericData.get().toString(record));
+          console.info(formatter.format(record, projection));
         } else {
-          console.info(Int96AwareGenericData.get().toString(select(projection, record, columns.get(0))));
+          console.info(formatter.format(select(projection, record, columns.get(0)), columnSchema));
         }
         count += 1;
       }
