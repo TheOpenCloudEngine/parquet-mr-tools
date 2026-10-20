@@ -1,14 +1,8 @@
 # Parquet Timestamp와 Timezone: NiFi · Impala · Spark 상호운용성 기술 가이드
 
-> **수정·심화판 v2.0** | 2026-10-20  
-> 원문: https://github.com/TheOpenCloudEngine/parquet-avro-tools/blob/main/timezone.md  
-> 적용 범위: Apache Parquet / Avro, Apache Spark 3.x, Apache Impala 및 Cloudera CDP Private Cloud Base 7.3.1, Apache NiFi / CFM  
-> **검증 수준:** 공식 규격·제품 문서와 원본 프로젝트 문서를 대조한 문헌 검토. 실제 NiFi–Impala–Spark 통합 실행 결과는 포함하지 않으며, 아래 테스트의 결과 표는 **예상값 또는 확인 항목**이다.
-
 ## 목차
 
 1. [핵심 결론](#1-핵심-결론)
-2. [원본 문서 정밀 리뷰와 수정 사항](#2-원본-문서-정밀-리뷰와-수정-사항)
 3. [시간 데이터 모델: Instant, Local, Offset, Zone](#3-시간-데이터-모델-instant-local-offset-zone)
 4. [Parquet의 물리 타입과 논리 타입](#4-parquet의-물리-타입과-논리-타입)
 5. [Avro와 JDBC 계층](#5-avro와-jdbc-계층)
@@ -47,34 +41,6 @@
 | Legacy **physical `INT96`** | timezone 의미가 자체 명시되지 않음 | **불명확** | 생성 엔진·옵션 및 실제 샘플 비교 필수 |
 
 > 주의: 2026년 시점의 최신 Parquet 명세는 새로운 12바이트 `FIXED_LEN_BYTE_ARRAY(12)` timestamp carrier도 설명한다. 그러나 **레거시 physical `INT96`**과 동일시하면 안 된다. 본 문서는 Spark·Impala에서 흔히 문제가 되는 레거시 INT96 및 INT64 경로에 초점을 맞춘다. [P1]
-
----
-
-## 2. 원본 문서 정밀 리뷰와 수정 사항
-
-| ID | 원본 설명·권고 요지 | 판정 | 수정 또는 제한 조건 |
-|---|---|---|---|
-| R01 | “Parquet에는 UTC 기준 시점이 저장된다.” | **정정 필수** | `isAdjustedToUTC=false`는 local timestamp다. INT96은 UTC 의미가 보장되지 않는다. |
-| R02 | “세 엔진은 같은 instant의 표시만 다르다.” | **정정 필수** | 실제 원인은 작성 단계의 의미 변경, JDBC 해석, 파일 주석, 조회 변환을 모두 포함한다. |
-| R03 | “Spark는 서버가 KST면 KST로 표시한다.” | 조건부 | session timezone이 우선이고, 실제 기본값은 런타임/JVM 등 환경에 따른다. 명시 설정 권장. |
-| R04 | “Hive·Spark INT96은 UTC 정규화, Impala INT96은 벽시계 값.” | 대체로 타당 | 일반적인 엔진/기본 경로의 차이. 버전·Spark Impala 호환 옵션·작성 환경에 따라 단정 금지. |
-| R05 | “Impala INT64는 UTC→로컬 변환.” | **세분화 필요** | Legacy OriginalType과 LogicalType(`isAdjustedToUTC`)의 규칙이 다르다. [I1] |
-| R06 | “`SET TIMEZONE='Asia/Seoul'`로 해결.” | **조건부** | `TIMEZONE`만으로 Impala의 모든 INT96 조회가 바뀌지 않는다. 관련 impalad flag 및 읽기 경로 확인. |
-| R07 | “`convert_legacy_hive_parquet_utc_timestamps`를 켠다.” | 신중 적용 | Hive 계열 INT96 대상. Impala가 만든 파일 등 혼합 디렉터리에서 전체 적용 시 재해석 위험. 운영 변경 전 분리 테스트. |
-| R08 | “`from_utc_timestamp()` 사용.” | 타당하지만 조건부 | 입력 컬럼이 **UTC 벽시계 값**인 것으로 증명되고 기존 변환이 적용되지 않았을 때만 사용. Impala에도 실제 지원 함수다. [I2] |
-| R09 | “NiFi의 Timestamp는 모두 GMT로 보인다.” | **일반화 금지** | RecordPath `format()` 기본 표시 규칙, JDBC 읽기, Avro 매핑, PutParquet를 별도로 분석해야 한다. |
-| R10 | “ExecuteSQL의 Avro logical type은 epoch millis.” | 확인 | `Use Avro Logical Types=true`인 경우 TIMESTAMP를 `timestamp-millis`로 기술. `false`는 문자열 경로. [N1] |
-| R11 | “`Created by: parquet-mr`면 Hive/Spark.” | **정정 필수** | parquet-mr는 Java 라이브러리. NiFi 및 자체 Java 애플리케이션도 사용할 수 있다. 생성 엔진 식별의 단서일 뿐. |
-| R12 | “repo CLI가 INT96을 `...Z`로 표시한다.” | 의미 제한 | 이 저장소 CLI의 **해석·포맷 정책**이다. INT96 자체의 UTC semantics를 입증하지 않는다. [R2] |
-| R13 | “INT96 보정 옵션은 읽기 문제 해결.” | 보강 필요 | Cloudera 호환 문서는 설정의 **읽기와 쓰기 모두**에 걸친 영향을 예시로 설명한다. [C1] |
-| R14 | “`TIMESTAMP_MICROS`로 전환하면 호환성 해결.” | 조건부 | 더 명료한 물리/논리 주석이지만, NTZ/LTZ 의미·구버전 리더 지원·기존 데이터 의미는 별도 검증해야 한다. |
-
-### 원본에서 반드시 고쳐야 할 두 문장
-
-- **부정확:** “Parquet 파일에는 timestamp가 UTC 기준의 시점으로 저장됩니다.”  
-  **수정:** “Parquet timestamp는 UTC 정규화된 instant 또는 시간대 없는 local timestamp를 나타낼 수 있다. `isAdjustedToUTC` 및 물리 타입을 확인해야 하고 레거시 INT96의 의미는 작성 엔진에 따라 달라질 수 있다.”
-- **부정확:** “Impala와 NiFi는 별도 설정이 없으면 UTC 그대로 00:00으로 보여 줍니다.”  
-  **수정:** “Impala INT96은 기본적으로 파일 값을 시간대 변환 없이 읽으며, INT64는 주석과 구현 설정에 따라 달리 처리한다. NiFi의 출력은 사용한 Processor, Reader, Writer, Avro schema 및 포맷 함수에 따라 달라진다.”
 
 ---
 
@@ -641,6 +607,3 @@ A. 단순 문자열이면 timezone 의미를 판단할 수 없다. `Avro schema`
 
 **운영 적용 판단:** 검증 테이블 T01~T10을 채우기 전까지 전역 옵션 변경·기존 파일 일괄 보정·시간 컬럼 재작성을 권장하지 않는다.
 
----
-
-*문서 끝 — `timezone.md`의 대체 문서로 채택하거나, 기존 파일에는 변경된 부분을 선별 반영할 수 있다.*
